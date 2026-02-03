@@ -13,7 +13,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!botToken) {
     return res.status(500).json({ error: "TELEGRAM_BOT_TOKEN not set" });
   }
-  const initData = req.method === "POST" ? (req.body?.initData as string) : (req.query?.initData as string);
+  let body = req.body;
+  if (typeof body === "string") {
+    try {
+      body = JSON.parse(body) as Record<string, unknown>;
+    } catch {
+      return res.status(400).json({ error: "Invalid JSON body" });
+    }
+  }
+  const initData = req.method === "POST" ? (body?.initData as string) : (req.query?.initData as string);
   if (!initData || typeof initData !== "string") {
     return res.status(400).json({ error: "initData required (POST body or GET query)" });
   }

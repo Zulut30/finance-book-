@@ -17,6 +17,20 @@ function chooseWelcome(lang?: string): string {
   return WELCOME_EN;
 }
 
+function parseBody(raw: unknown): { message?: { chat?: { id?: number }; text?: string; from?: { language_code?: string } } } | null {
+  if (raw == null) return null;
+  if (typeof raw === "object" && "message" in (raw as object)) return raw as { message?: { chat?: { id?: number }; text?: string; from?: { language_code?: string } } };
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      return parsed && typeof parsed === "object" ? (parsed as { message?: { chat?: { id?: number }; text?: string; from?: { language_code?: string } } }) : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -26,27 +40,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!botToken) {
     return res.status(500).json({ error: "TELEGRAM_BOT_TOKEN not set" });
   }
-  const body = req.body as {
-    message?: { chat?: { id?: number }; text?: string; from?: { language_code?: string } };
-  };
+  const body = parseBody(req.body);
   const chatId = body?.message?.chat?.id;
-  const text = body?.message?.text?.trim();
+  const text = (body?.message?.text ?? "").trim();
   const lang = body?.message?.from?.language_code;
 
   if (chatId == null) {
     return res.status(200).send("ok");
   }
 
-  if (text === "/start") {
+  if (text === "/start" || text.startsWith("/start ")) {
     const welcome = chooseWelcome(lang);
     try {
-      await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      const sendRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chat_id: chatId, text: welcome }),
       });
-    } catch {
-      // ignore
+      if (!sendRes.ok) {
+        const errText = await sendRes.text();
+        console.error("Telegram sendMessage failed:", sendRes.status, errText);
+      }
+    } catch (e) {
+      console.error("Telegram sendMessage error:", e);
     }
   }
 

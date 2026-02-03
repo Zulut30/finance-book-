@@ -43,7 +43,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!botToken) {
     return res.status(500).json({ error: "Server: TELEGRAM_BOT_TOKEN not set" });
   }
-  const { initData, transactions, subscriptions, wishes, language, baseCurrency } = req.body as {
+  let body = req.body;
+  if (typeof body === "string") {
+    try {
+      body = JSON.parse(body) as Record<string, unknown>;
+    } catch {
+      return res.status(400).json({ error: "Invalid JSON body" });
+    }
+  }
+  const { initData, transactions, subscriptions, wishes, language, baseCurrency } = body as {
     initData?: string;
     transactions?: Transaction[];
     subscriptions?: Subscription[];

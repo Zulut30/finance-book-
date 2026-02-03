@@ -154,27 +154,37 @@ npm run build
 - Click the menu button in your bot's chat, or
 - Navigate to `https://t.me/YourBotName/app`
 
-### 5. Webhook: приветствие по /start
+### 5. Webhook: команда /start (обязательно для приветствия)
 
-Чтобы бот отвечал на команду `/start` приветственным сообщением, нужно направить обновления от Telegram на ваш сервер (webhook):
+**Без этого шага бот не будет отвечать на /start.**
 
-1. После деплоя на Vercel получите URL приложения (например `https://your-app.vercel.app`).
-2. Установите webhook (один раз), выполнив в браузере или через curl:
+1. В Vercel в настройках проекта задайте переменную окружения `TELEGRAM_BOT_TOKEN` (токен от @BotFather).
+2. После деплоя откройте в браузере (подставьте свой токен и URL):
    ```
-   https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook?url=https://your-app.vercel.app/api/webhook
+   https://api.telegram.org/bot<ВАШ_TELEGRAM_BOT_TOKEN>/setWebhook?url=https://<ваш-домен>.vercel.app/api/webhook
    ```
-3. После этого при отправке пользователем команды `/start` в чат с ботом придёт приветствие (на русском, английском или польском — по языку пользователя в Telegram).
+   Успешный ответ: `{"ok":true,"result":true,"description":"Webhook was set"}`.
+3. Проверка: напишите боту в Telegram команду `/start` — должно прийти приветствие (RU/EN/PL по языку в настройках Telegram).
 
 ---
 
 ## Синхронизация между устройствами
 
-При открытии приложения **из Telegram** (один аккаунт) данные синхронизируются между устройствами:
+**Чтобы синхронизация работала, нужны оба условия:**
 
-- **При запуске**: запрос к `/api/data` по `initData`; если на сервере есть сохранённые данные (`updatedAt`), подгружаются транзакции, подписки и список желаний и подставляются в приложение и в `localStorage`.
-- **При изменениях**: через 2 с после любого изменения транзакций, подписок или желаний все три набора отправляются на сервер через `POST /api/sync`. Так данные с текущего устройства попадают в облако и станут видны на других устройствах при следующем открытии.
+1. Открывать приложение **из Telegram** (меню бота), а не по прямой ссылке в браузере.
+2. **Настроить Upstash Redis** в Vercel: переменные `KV_REST_API_URL` и `KV_REST_API_TOKEN`. Без них данные на сервере не сохраняются между запросами (каждый запрос может попадать на другой экземпляр), поэтому на другом устройстве будет «пустой» аккаунт.
 
-Хранилище то же, что и для push-напоминаний (Redis при наличии `KV_*`, иначе in-memory). Для стабильной синхронизации между устройствами нужен деплой на Vercel и при необходимости Upstash Redis.
+Как работает синхронизация:
+
+- **При запуске**: запрос к `/api/data` по `initData`; если на сервере есть сохранённые данные (`updatedAt`), подгружаются транзакции, подписки и список желаний.
+- **При изменениях**: через 2 с после изменений данные отправляются на сервер через `POST /api/sync`.
+
+**Настройка Upstash Redis (бесплатный тариф):**
+
+1. Зарегистрируйтесь на [upstash.com](https://upstash.com), создайте базу Redis.
+2. В Vercel → Project → Settings → Environment Variables добавьте `KV_REST_API_URL` и `KV_REST_API_TOKEN` из панели Upstash.
+3. Передеплойте проект.
 
 ---
 
@@ -192,9 +202,9 @@ FinTrack can send Telegram reminders for upcoming subscription payments.
 
 1. Deploy to **Vercel** (required for API routes and cron)
 2. Set environment variables in Vercel dashboard:
-   - `TELEGRAM_BOT_TOKEN`
-   - `CRON_SECRET`
-   - (Optional) Upstash Redis credentials for persistent storage
+   - `TELEGRAM_BOT_TOKEN` (required for webhook and cron)
+   - `CRON_SECRET` (for cron authentication)
+   - `KV_REST_API_URL` and `KV_REST_API_TOKEN` (Upstash Redis — **required for cross-device sync**; without them, data is not shared between devices)
 3. Enable "Notify 3 days before" for subscriptions in the app
 
 ---
