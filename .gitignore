@@ -26,6 +26,9 @@ dist-ssr
 *.sln
 *.sw?
 
+# Test coverage
+coverage
+
 # Claude Code / Cursor
 .claude/
 .cursor/

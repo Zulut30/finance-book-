@@ -4,7 +4,7 @@ const APP_ID = typeof import.meta !== "undefined" && import.meta.env?.VITE_OPENE
   ? String(import.meta.env.VITE_OPENEXCHANGERATES_APP_ID).trim()
   : "";
 
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour (free tier: daily updates)
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour (free tier: daily updates). Single in-memory entry, no unbounded growth.
 
 // Demo fallback when API is unavailable or no key
 const DEMO_TO_PLN: Record<Currency, number> = {
@@ -72,9 +72,9 @@ function buildRatesFromUsdRates(ratesUsd: Record<string, number>): CachedRates {
 }
 
 function getRates(): CachedRates {
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    return cached;
-  }
+  const now = Date.now();
+  if (cached && now - cached.timestamp < CACHE_TTL_MS) return cached;
+  if (cached && now - cached.timestamp > CACHE_TTL_MS * 2) cached = null; // allow refetch when stale
   return {
     toPln: DEMO_TO_PLN,
     exchangeRates: DEMO_EXCHANGE_RATES,

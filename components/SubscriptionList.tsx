@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Subscription, Currency } from '../types';
+import { Subscription, Currency, CurrencySymbols } from '../types';
+import { convertCurrency } from '../services/currencyService';
+import { useBaseCurrency } from '../context/BaseCurrencyContext';
 import { useLanguage } from '../context/LanguageContext';
 import { Calendar, Plus, Trash2, Zap, Bell, BellOff, Pencil, X, LayoutGrid, List } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
@@ -22,6 +24,7 @@ const COLORS = [
 
 export const SubscriptionList: React.FC<SubscriptionListProps> = React.memo(({ subscriptions, onAdd, onRemove, onUpdate }) => {
   const { t, language } = useLanguage();
+  const { baseCurrency } = useBaseCurrency();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
@@ -228,7 +231,7 @@ export const SubscriptionList: React.FC<SubscriptionListProps> = React.memo(({ s
             <h2 className="text-lg font-bold text-white mb-1">{t.subs.title}</h2>
             <div className="flex items-baseline gap-1">
                 <span className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-fuchsia-400">
-                    {totalMonthly} {Currency.PLN}
+                    {totalMonthlyInBase.toLocaleString()} {CurrencySymbols[baseCurrency]}
                 </span>
                 <span className="text-xs text-slate-400">{t.subs.month}</span>
             </div>
@@ -360,7 +363,7 @@ export const SubscriptionList: React.FC<SubscriptionListProps> = React.memo(({ s
                             </div>
                             
                             <div className="text-right">
-                                <div className="font-bold text-white text-lg">{sub.price} <span className="text-xs font-normal opacity-70">{Currency.PLN}</span></div>
+                                <div className="font-bold text-white text-lg">{convertCurrency(sub.price, Currency.PLN, baseCurrency).toLocaleString()} <span className="text-xs font-normal opacity-70">{CurrencySymbols[baseCurrency]}</span></div>
                                 <div className={`text-xs font-medium px-2 py-0.5 rounded-full inline-block mt-1 ${
                                     daysLeft <= 3 
                                     ? 'bg-rose-500/20 text-rose-300 border border-rose-500/20' 

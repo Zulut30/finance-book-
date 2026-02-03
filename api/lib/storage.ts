@@ -1,8 +1,16 @@
 /**
- * Storage for user subscriptions. Uses Vercel KV if env is set, else in-memory (resets on cold start).
+ * Storage for user subscriptions.
+ * - If KV_REST_API_* env is set: uses Upstash Redis (persistent).
+ * - Else: in-memory Map with max size cap to avoid unbounded growth (resets on cold start).
  */
-
+const MAX_MEMORY_KEYS = 5000;
 const memory = new Map<string, string>();
+
+function memoryEvictOldest(): void {
+  if (memory.size <= MAX_MEMORY_KEYS) return;
+  const keysToDelete = Array.from(memory.keys()).slice(0, memory.size - MAX_MEMORY_KEYS);
+  keysToDelete.forEach((k) => memory.delete(k));
+}
 
 // Upstash Redis REST API: POST with body [ "COMMAND", ...args ]
 function getKv(): { get: (k: string) => Promise<string | null>; set: (k: string, v: string) => Promise<void>; keys: (pattern: string) => Promise<string[]> } | null {
@@ -32,22 +40,59 @@ function getKv(): { get: (k: string) => Promise<string | null>; set: (k: string,
 
 const kv = getKv();
 
-export async function getUserSubscriptions(telegramId: number): Promise<{ subscriptions: unknown[]; updatedAt: string } | null> {
+export interface UserData {
+  transactions: unknown[];
+  subscriptions: unknown[];
+  wishes: unknown[];
+  language?: string;
+  baseCurrency?: string;
+  updatedAt: string;
+}
+
+export async function getUserData(telegramId: number): Promise<UserData | null> {
   const key = `user:${telegramId}`;
   const raw = kv ? await kv.get(key) : memory.get(key) ?? null;
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as { subscriptions: unknown[]; updatedAt: string };
+    const parsed = JSON.parse(raw) as UserData;
+    if (!parsed || typeof parsed !== "object") return null;
+    return {
+      transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
+      subscriptions: Array.isArray(parsed.subscriptions) ? parsed.subscriptions : [],
+      wishes: Array.isArray(parsed.wishes) ? parsed.wishes : [],
+      language: typeof parsed.language === "string" ? parsed.language : undefined,
+      baseCurrency: typeof parsed.baseCurrency === "string" ? parsed.baseCurrency : undefined,
+      updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : new Date().toISOString(),
+    };
   } catch {
     return null;
   }
 }
 
-export async function setUserSubscriptions(telegramId: number, subscriptions: unknown[]): Promise<void> {
+export async function setUserData(telegramId: number, data: Omit<UserData, "updatedAt"> & { updatedAt?: string }): Promise<void> {
   const key = `user:${telegramId}`;
-  const value = JSON.stringify({ subscriptions, updatedAt: new Date().toISOString() });
-  if (kv) await kv.set(key, value);
-  else memory.set(key, value);
+  const value = JSON.stringify({ ...data, updatedAt: data.updatedAt ?? new Date().toISOString() });
+  if (kv) {
+    await kv.set(key, value);
+  } else {
+    memory.set(key, value);
+    memoryEvictOldest();
+  }
+}
+
+export async function getUserSubscriptions(telegramId: number): Promise<{ subscriptions: unknown[]; updatedAt: string } | null> {
+  const data = await getUserData(telegramId);
+  return data ? { subscriptions: data.subscriptions, updatedAt: data.updatedAt } : null;
+}
+
+export async function setUserSubscriptions(telegramId: number, subscriptions: unknown[]): Promise<void> {
+  const data = await getUserData(telegramId);
+  await setUserData(telegramId, {
+    transactions: data?.transactions ?? [],
+    subscriptions,
+    wishes: data?.wishes ?? [],
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 export async function getAllUserKeys(): Promise<string[]> {
@@ -59,7 +104,8 @@ export async function getSubscriptionsByKey(key: string): Promise<{ subscription
   const raw = kv ? await kv.get(key) : memory.get(key) ?? null;
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as { subscriptions: unknown[]; updatedAt: string };
+    const parsed = JSON.parse(raw) as UserData;
+    return parsed ? { subscriptions: Array.isArray(parsed.subscriptions) ? parsed.subscriptions : [], updatedAt: parsed.updatedAt || "" } : null;
   } catch {
     return null;
   }

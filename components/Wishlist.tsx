@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Wish, CurrencySymbols, Currency } from '../types';
+import { convertCurrency } from '../services/currencyService';
+import { useBaseCurrency } from '../context/BaseCurrencyContext';
 import { useLanguage } from '../context/LanguageContext';
 import { Gift, Plus, ExternalLink, Check, Trash2, Share2 } from 'lucide-react';
 import { triggerHaptic, triggerNotification, showConfirm } from '../utils/telegram';
@@ -14,6 +16,7 @@ interface WishlistProps {
 
 export const Wishlist: React.FC<WishlistProps> = ({ wishes, onAdd, onRemove, onToggle }) => {
   const { t } = useLanguage();
+  const { baseCurrency } = useBaseCurrency();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
@@ -29,6 +32,7 @@ export const Wishlist: React.FC<WishlistProps> = ({ wishes, onAdd, onRemove, onT
       .filter(w => !w.isCompleted)
       .reduce((acc, w) => acc + w.price, 0);
   }, [wishes]);
+  const totalNeededInBase = useMemo(() => convertCurrency(totalNeeded, Currency.PLN, baseCurrency), [totalNeeded, baseCurrency]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,9 +77,9 @@ export const Wishlist: React.FC<WishlistProps> = ({ wishes, onAdd, onRemove, onT
         return;
     }
 
-    let message = `🎁 ${t.wishlist.title} (${totalNeeded} ${CurrencySymbols[Currency.PLN]})\n\n`;
+    let message = `🎁 ${t.wishlist.title} (${totalNeededInBase.toLocaleString()} ${CurrencySymbols[baseCurrency]})\n\n`;
     activeWishes.forEach((w, index) => {
-        message += `${index + 1}. ${w.title} - ${w.price} ${CurrencySymbols[Currency.PLN]}\n`;
+        message += `${index + 1}. ${w.title} - ${convertCurrency(w.price, Currency.PLN, baseCurrency).toLocaleString()} ${CurrencySymbols[baseCurrency]}\n`;
         if (w.url) {
             message += `   🔗 ${w.url}\n`;
         }
@@ -108,9 +112,9 @@ export const Wishlist: React.FC<WishlistProps> = ({ wishes, onAdd, onRemove, onT
             <h2 className="text-sm font-semibold text-slate-300 mb-1">{t.wishlist.total}</h2>
             <div className="flex items-baseline gap-1">
                 <span className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-rose-400">
-                    {totalNeeded.toLocaleString()}
+                    {totalNeededInBase.toLocaleString()}
                 </span>
-                <span className="text-sm font-medium text-slate-400">{CurrencySymbols[Currency.PLN]}</span>
+                <span className="text-sm font-medium text-slate-400">{CurrencySymbols[baseCurrency]}</span>
             </div>
         </div>
         
@@ -218,7 +222,7 @@ export const Wishlist: React.FC<WishlistProps> = ({ wishes, onAdd, onRemove, onT
                              </h4>
                              <div className="flex items-center gap-2 mt-0.5">
                                  <span className="text-sm font-bold text-slate-300">
-                                     {wish.price} {CurrencySymbols[Currency.PLN]}
+                                     {convertCurrency(wish.price, Currency.PLN, baseCurrency).toLocaleString()} {CurrencySymbols[baseCurrency]}
                                  </span>
                                  {wish.url && (
                                      <a 

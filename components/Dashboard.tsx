@@ -6,6 +6,7 @@ import { TrendingUp, TrendingDown, Wallet, ArrowRight, ChevronLeft, ChevronRight
 import { triggerHaptic } from '../utils/telegram';
 import { Flag } from './Flag';
 import { convertCurrency, getRateSourceInfo } from '../services/currencyService';
+import { useBaseCurrency } from '../context/BaseCurrencyContext';
 
 interface DashboardProps {
   transactions: Transaction[];
@@ -50,10 +51,12 @@ const COLORS = ['#8b5cf6', '#d946ef', '#f43f5e', '#ec4899', '#6366f1', '#3b82f6'
 
 export const Dashboard: React.FC<DashboardProps> = React.memo(({ transactions, summary, subscriptions, onViewSubscriptions }) => {
   const { t, language, setLanguage } = useLanguage();
+  const { baseCurrency } = useBaseCurrency();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [chartType, setChartType] = useState<'expense' | 'income'>('expense');
-  
-  const animatedBalance = useCountUp(summary.balance);
+
+  const balanceInBase = useMemo(() => convertCurrency(summary.balance, Currency.PLN, baseCurrency), [summary.balance, baseCurrency]);
+  const animatedBalance = useCountUp(balanceInBase);
 
   const handlePrevMonth = () => {
     triggerHaptic('light');
@@ -105,6 +108,10 @@ export const Dashboard: React.FC<DashboardProps> = React.memo(({ transactions, s
   }, [monthlyTransactions]);
   
   const totalSubs = useMemo(() => subscriptions.reduce((acc, s) => acc + s.price, 0), [subscriptions]);
+
+  const monthlyIncomeInBase = useMemo(() => convertCurrency(monthlyStats.income, Currency.PLN, baseCurrency), [monthlyStats.income, baseCurrency]);
+  const monthlyExpenseInBase = useMemo(() => convertCurrency(monthlyStats.expense, Currency.PLN, baseCurrency), [monthlyStats.expense, baseCurrency]);
+  const totalSubsInBase = useMemo(() => convertCurrency(totalSubs, Currency.PLN, baseCurrency), [totalSubs, baseCurrency]);
 
   const marketRates = useMemo(() => {
     const base = Currency.USD;
@@ -166,7 +173,7 @@ export const Dashboard: React.FC<DashboardProps> = React.memo(({ transactions, s
                 <p className="text-white/70 text-sm font-medium mb-1">{t.dashboard.balance}</p>
                 {/* Responsive font size: 3xl on mobile, 4xl on larger screens */}
                 <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight tabular-nums truncate">
-                    {animatedBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xl sm:text-2xl opacity-80">{CurrencySymbols[Currency.PLN]}</span>
+                    {animatedBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xl sm:text-2xl opacity-80">{CurrencySymbols[baseCurrency]}</span>
                 </h2>
             </div>
             <div className="bg-white/20 backdrop-blur-md p-2 rounded-xl shrink-0 ml-2">
@@ -211,7 +218,7 @@ export const Dashboard: React.FC<DashboardProps> = React.memo(({ transactions, s
                 </div>
                 <span className="text-[10px] uppercase font-bold tracking-wider opacity-80">{t.dashboard.income}</span>
               </div>
-              <p className="font-bold text-lg sm:text-xl text-white truncate">{monthlyStats.income.toLocaleString()} <span className="text-sm">{CurrencySymbols[Currency.PLN]}</span></p>
+              <p className="font-bold text-lg sm:text-xl text-white truncate">{monthlyIncomeInBase.toLocaleString()} <span className="text-sm">{CurrencySymbols[baseCurrency]}</span></p>
             </div>
 
             <div className="glass-card rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden transition-all active:scale-[0.98]">
@@ -224,7 +231,7 @@ export const Dashboard: React.FC<DashboardProps> = React.memo(({ transactions, s
                 </div>
                 <span className="text-[10px] uppercase font-bold tracking-wider opacity-80">{t.dashboard.expense}</span>
               </div>
-              <p className="font-bold text-lg sm:text-xl text-white truncate">{monthlyStats.expense.toLocaleString()} <span className="text-sm">{CurrencySymbols[Currency.PLN]}</span></p>
+              <p className="font-bold text-lg sm:text-xl text-white truncate">{monthlyExpenseInBase.toLocaleString()} <span className="text-sm">{CurrencySymbols[baseCurrency]}</span></p>
             </div>
           </div>
       </div>
@@ -241,7 +248,7 @@ export const Dashboard: React.FC<DashboardProps> = React.memo(({ transactions, s
             </div>
             <div className="text-left overflow-hidden">
                 <div className="text-sm font-bold text-white truncate">{t.dashboard.subscriptions}</div>
-                <div className="text-xs text-slate-400 truncate">{subscriptions.length} {t.dashboard.subSubtitle} • {totalSubs} {CurrencySymbols[Currency.PLN]}{t.subs.month}</div>
+                <div className="text-xs text-slate-400 truncate">{subscriptions.length} {t.dashboard.subSubtitle} • {totalSubsInBase.toLocaleString()} {CurrencySymbols[baseCurrency]}{t.subs.month}</div>
             </div>
         </div>
         <ArrowRight size={18} className="text-slate-500 group-hover:text-white transition-colors shrink-0" />
@@ -279,7 +286,7 @@ export const Dashboard: React.FC<DashboardProps> = React.memo(({ transactions, s
                 {/* Center text for chart */}
                 <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
                     <span className="text-slate-500 text-xs">{t.dashboard.total}</span>
-                    <span className="text-white font-bold">{activeTotal.toLocaleString()} {CurrencySymbols[Currency.PLN]}</span>
+                    <span className="text-white font-bold">{convertCurrency(activeTotal, Currency.PLN, baseCurrency).toLocaleString()} {CurrencySymbols[baseCurrency]}</span>
                 </div>
                 <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -306,7 +313,7 @@ export const Dashboard: React.FC<DashboardProps> = React.memo(({ transactions, s
                         borderRadius: '16px',
                         boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)'
                     }}
-                    formatter={(value: number) => [`${value} ${CurrencySymbols[Currency.PLN]}`, '']}
+                    formatter={(value: number) => [`${convertCurrency(value, Currency.PLN, baseCurrency).toLocaleString()} ${CurrencySymbols[baseCurrency]}`, '']}
                     itemStyle={{ color: '#e2e8f0' }}
                     cursor={false}
                     />

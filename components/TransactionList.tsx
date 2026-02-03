@@ -1,5 +1,7 @@
 import React, { useMemo } from 'react';
 import { Transaction, TransactionType, Currency, CurrencySymbols } from '../types';
+import { convertCurrency } from '../services/currencyService';
+import { useBaseCurrency } from '../context/BaseCurrencyContext';
 import { useLanguage } from '../context/LanguageContext';
 import { triggerHaptic, showConfirm, triggerNotification } from '../utils/telegram';
 import { 
@@ -64,6 +66,7 @@ const getCategoryDetails = (category: string) => {
 
 export const TransactionList: React.FC<TransactionListProps> = React.memo(({ transactions, onDelete }) => {
   const { t, language } = useLanguage();
+  const { baseCurrency } = useBaseCurrency();
 
   const handleExportCSV = () => {
     triggerHaptic('light');
@@ -192,7 +195,8 @@ export const TransactionList: React.FC<TransactionListProps> = React.memo(({ tra
                     {(groupT as Transaction[]).map((tItem) => {
                         const { icon: Icon, color, text } = getCategoryDetails(tItem.category);
                         const isIncome = tItem.type === TransactionType.INCOME;
-                        const hasOriginal = tItem.originalCurrency && tItem.originalCurrency !== Currency.PLN;
+                        const hasOriginal = tItem.originalCurrency && tItem.originalCurrency !== baseCurrency;
+                        const amountInBase = convertCurrency(tItem.amount, Currency.PLN, baseCurrency);
 
                         return (
                             <div 
@@ -217,7 +221,7 @@ export const TransactionList: React.FC<TransactionListProps> = React.memo(({ tra
                                 <p className={`font-bold text-base ${
                                 isIncome ? 'text-emerald-400' : 'text-white'
                                 }`}>
-                                {isIncome ? '+' : '-'}{tItem.amount} <span className="text-sm font-normal opacity-70">{CurrencySymbols[Currency.PLN]}</span>
+                                {isIncome ? '+' : '-'}{amountInBase.toLocaleString()} <span className="text-sm font-normal opacity-70">{CurrencySymbols[baseCurrency]}</span>
                                 </p>
                                 {hasOriginal && (
                                     <p className="text-[10px] text-slate-400 mt-0.5">

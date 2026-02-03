@@ -50,7 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const when = days === 0 ? "Сегодня" : days === 1 ? "Завтра" : `Через ${days} дн.`;
       return `• ${s.name} — ${s.price} zł (${when})`;
     });
-    const text = `🔔 FinTrack: скоро списание подписок\n\n${lines.join("\n")}`;
+    const text = `🔔 FinTrack: скоро списание подписок\n\n${lines.join("\n")}\n\n— Manacost`;
     try {
       const r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         method: "POST",

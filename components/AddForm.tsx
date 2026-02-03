@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction, TransactionType, Currency, CurrencySymbols, CurrencyFlags } from '../types';
-import { convertToPLN, getRateDisplay } from '../services/currencyService';
+import { convertToPLN, getRateDisplay, convertCurrency } from '../services/currencyService';
+import { useBaseCurrency } from '../context/BaseCurrencyContext';
 import { useLanguage } from '../context/LanguageContext';
 import { v4 as uuidv4 } from 'uuid';
 import { X, Check, Globe } from 'lucide-react';
@@ -30,6 +31,7 @@ export const AddForm: React.FC<AddFormProps> = ({ onAdd, onClose }) => {
 
   const [type, setType] = useState<TransactionType>(TransactionType.EXPENSE);
   const [amount, setAmount] = useState('');
+  const { baseCurrency } = useBaseCurrency();
   const [currency, setCurrency] = useState<Currency>(Currency.PLN);
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState(categoryOptions[TransactionType.EXPENSE][0]);
@@ -177,7 +179,7 @@ export const AddForm: React.FC<AddFormProps> = ({ onAdd, onClose }) => {
               <div className="mt-2 px-2 flex items-center justify-between text-xs">
                   <span className="text-slate-500">{getRateDisplay(currency)}</span>
                   <span className="text-emerald-400 font-medium">
-                      ≈ {convertedAmount.toLocaleString()} {CurrencySymbols[Currency.PLN]}
+                      ≈ {convertCurrency(convertedAmount, Currency.PLN, baseCurrency).toLocaleString()} {CurrencySymbols[baseCurrency]}
                   </span>
               </div>
           )}

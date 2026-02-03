@@ -15,6 +15,8 @@
 **FinTrack** is a modern personal finance management app designed as a Telegram Mini App.
 Track expenses, manage subscriptions, convert currencies, and get AI-powered financial advice.
 
+**Разработано командой Manacost** · Developed by Manacost team
+
 [Features](#features) • [Demo](#demo) • [Installation](#installation) • [Telegram Setup](#telegram-setup) • [Environment Variables](#environment-variables)
 
 </div>
@@ -92,6 +94,32 @@ Create a `.env` file based on `.env.example`:
 
 ---
 
+## Testing
+
+Unit and integration tests (Vitest):
+
+```bash
+npm test          # run tests once
+npm run test:watch    # watch mode
+npm run test:coverage # with coverage report
+```
+
+Tests cover:
+
+- **services/currencyService** — конвертация валют, кэш, демо-курсы; тесты на скорость (10 000 вызовов `convertCurrency` / `convertToPLN` за &lt;500 ms).
+- **api/lib/storage** — парсинг ключей, сохранение/чтение данных, лимит in-memory (до 5000 ключей); тест на скорость 100 операций set/get.
+- **api/lib/telegram** — проверка `initData` (валидный хэш, истёкший/неверный `auth_date`, отсутствие `user`/`hash`).
+
+Память и производительность:
+
+- Кэш курсов валют: один объект, TTL 1 час, без неограниченного роста.
+- In-memory хранилище (без Redis): не более 5000 ключей, при переполнении удаляются старые.
+- Синхронизация с сервером: debounce 2 с, один запрос с полным набором данных.
+
+Подробнее см. `docs/TESTING.md`.
+
+---
+
 ## Telegram Setup
 
 To run FinTrack as a Telegram Mini App:
@@ -126,6 +154,28 @@ npm run build
 - Click the menu button in your bot's chat, or
 - Navigate to `https://t.me/YourBotName/app`
 
+### 5. Webhook: приветствие по /start
+
+Чтобы бот отвечал на команду `/start` приветственным сообщением, нужно направить обновления от Telegram на ваш сервер (webhook):
+
+1. После деплоя на Vercel получите URL приложения (например `https://your-app.vercel.app`).
+2. Установите webhook (один раз), выполнив в браузере или через curl:
+   ```
+   https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook?url=https://your-app.vercel.app/api/webhook
+   ```
+3. После этого при отправке пользователем команды `/start` в чат с ботом придёт приветствие (на русском, английском или польском — по языку пользователя в Telegram).
+
+---
+
+## Синхронизация между устройствами
+
+При открытии приложения **из Telegram** (один аккаунт) данные синхронизируются между устройствами:
+
+- **При запуске**: запрос к `/api/data` по `initData`; если на сервере есть сохранённые данные (`updatedAt`), подгружаются транзакции, подписки и список желаний и подставляются в приложение и в `localStorage`.
+- **При изменениях**: через 2 с после любого изменения транзакций, подписок или желаний все три набора отправляются на сервер через `POST /api/sync`. Так данные с текущего устройства попадают в облако и станут видны на других устройствах при следующем открытии.
+
+Хранилище то же, что и для push-напоминаний (Redis при наличии `KV_*`, иначе in-memory). Для стабильной синхронизации между устройствами нужен деплой на Vercel и при необходимости Upstash Redis.
+
 ---
 
 ## Push Notifications
@@ -134,7 +184,7 @@ FinTrack can send Telegram reminders for upcoming subscription payments.
 
 ### How It Works
 
-1. **Sync:** When opened in Telegram, subscriptions sync to the server via `/api/sync`
+1. **Sync:** When opened in Telegram, all data (transactions, subscriptions, wishes) syncs to the server via `/api/sync`; on load, data is fetched from `/api/data`.
 2. **Cron Job:** Daily at 09:00 UTC, `/api/cron/remind` checks for upcoming payments
 3. **Notify:** Users with subscriptions due in 0-3 days receive a Telegram message
 
@@ -154,7 +204,9 @@ FinTrack can send Telegram reminders for upcoming subscription payments.
 ```
 FinTrack/
 ├── api/                    # Vercel serverless functions
-│   ├── sync.ts            # Subscription sync endpoint
+│   ├── data.ts            # GET user data (sync across devices)
+│   ├── sync.ts            # POST save transactions, subscriptions, wishes
+│   ├── webhook.ts         # Telegram webhook: /start welcome message
 │   └── cron/
 │       └── remind.ts      # Daily notification cron
 ├── components/             # React components

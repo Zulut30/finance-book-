@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { Home, List, Plus, Gift, ArrowDownUp } from 'lucide-react';
 import { TabView } from '../types';
 import { useLanguage } from '../context/LanguageContext';
@@ -12,18 +12,18 @@ interface NavigationProps {
 export const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab }) => {
   const { t } = useLanguage();
 
-  const handleNavClick = (tab: TabView) => {
-      triggerHaptic('light');
-      setActiveTab(tab);
-  };
+  const handleNavClick = useCallback((tab: TabView) => {
+    triggerHaptic('light');
+    setActiveTab(tab);
+  }, [setActiveTab]);
 
-  const navItems = [
+  const navItems = useMemo(() => [
     { id: 'dashboard', icon: Home, label: t.nav.home },
     { id: 'transactions', icon: List, label: t.nav.history },
     { id: 'add', icon: Plus, label: t.nav.add, isMain: true },
     { id: 'converter', icon: ArrowDownUp, label: t.nav.converter },
     { id: 'wishlist', icon: Gift, label: t.nav.wishlist },
-  ];
+  ], [t]);
 
   return (
     <div className="fixed bottom-6 left-0 w-full px-4 z-50 pointer-events-none">

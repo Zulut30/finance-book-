@@ -18,6 +18,18 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
-      }
+      },
+      test: {
+        environment: 'node',
+        include: ['**/*.test.ts', '**/*.test.tsx'],
+        exclude: ['node_modules', 'dist'],
+        coverage: {
+          provider: 'v8',
+          reporter: ['text', 'json-summary'],
+          include: ['services/**/*.ts', 'api/lib/**/*.ts'],
+          exclude: ['**/*.test.ts', '**/types.ts'],
+        },
+        testTimeout: 10000,
+      },
     };
 });

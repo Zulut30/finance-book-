@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Currency, CurrencySymbols, CurrencyFlags } from '../types';
-import { convertCurrency } from '../services/currencyService';
+import { convertCurrency, getRateSourceInfo } from '../services/currencyService';
 import { useLanguage } from '../context/LanguageContext';
 import { ArrowDownUp, Search } from 'lucide-react';
 import { Flag } from './Flag';
@@ -211,7 +211,7 @@ export const Converter: React.FC = React.memo(() => {
                 
                 <div className="mt-8 text-center pb-4">
                     <p className="text-[10px] text-slate-600">
-                        FinTrack AI • Rates for demo
+                        {getRateSourceInfo()} · {t.footer.credits}
                     </p>
                 </div>
             </div>

@@ -3,9 +3,12 @@ import { Navigation } from './components/Navigation';
 import { TabView, Transaction, Subscription, FinancialSummary, TransactionType, Currency, Wish } from './types';
 import { Loader2 } from 'lucide-react';
 import { LanguageProvider } from './context/LanguageContext';
+import { BaseCurrencyProvider, useBaseCurrency } from './context/BaseCurrencyContext';
 import { ExchangeRatesProvider } from './context/ExchangeRatesContext';
 import { triggerHaptic } from './utils/telegram';
-import { syncSubscriptionsToServer } from './services/subscriptionsSync';
+import { fetchUserData, syncUserData } from './services/userDataSync';
+import { useLanguage } from './context/LanguageContext';
+import { OnboardingScreen } from './components/OnboardingScreen';
 
 // Lazy load heavy components
 const Dashboard = React.lazy(() => import('./components/Dashboard').then(module => ({ default: module.Dashboard })));
@@ -36,9 +39,26 @@ const LoadingFallback = () => (
   </div>
 );
 
+const AppFooter: React.FC = () => {
+  const { t } = useLanguage();
+  return (
+    <footer className="text-center py-3 text-slate-500 text-[10px]">
+      FinTrack · {t.footer.credits}
+    </footer>
+  );
+};
+
+const ONBOARDING_KEY = 'fintrack_onboarding_done';
+
 const AppContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabView>('dashboard');
-  
+  const [onboardingDone, setOnboardingDone] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return localStorage.getItem(ONBOARDING_KEY) === '1';
+  });
+  const { language, setLanguage } = useLanguage();
+  const { baseCurrency, setBaseCurrency } = useBaseCurrency();
+
   useEffect(() => {
     // Basic Telegram WebApp initialization
     if (window.Telegram?.WebApp) {
@@ -79,16 +99,52 @@ const AppContent: React.FC = () => {
     localStorage.setItem('subscriptions', JSON.stringify(subscriptions));
   }, [subscriptions]);
 
-  // Sync subscriptions to backend for Telegram push reminders (when opened from Telegram)
-  useEffect(() => {
-    if (subscriptions.length >= 0 && window.Telegram?.WebApp?.initData) {
-      syncSubscriptionsToServer(subscriptions).catch(() => {});
-    }
-  }, [subscriptions]);
-
   useEffect(() => {
     localStorage.setItem('wishes', JSON.stringify(wishes));
   }, [wishes]);
+
+  // Load data from server when opened in Telegram (same account = sync across devices)
+  useEffect(() => {
+    if (!window.Telegram?.WebApp?.initData) return;
+    fetchUserData().then((data) => {
+      if (!data) return;
+      if (data.language && (data.language === 'ru' || data.language === 'en' || data.language === 'pl')) {
+        setLanguage(data.language);
+        localStorage.setItem('fintrack_language', data.language);
+      }
+      if (data.baseCurrency && ['RUB', 'BYN', 'PLN', 'USD', 'EUR'].includes(data.baseCurrency)) {
+        setBaseCurrency(data.baseCurrency as import('./types').Currency);
+        localStorage.setItem('fintrack_base_currency', data.baseCurrency);
+      }
+      if (data.updatedAt) {
+        setTransactions(data.transactions as Transaction[]);
+        setSubscriptions(data.subscriptions as Subscription[]);
+        setWishes(data.wishes as Wish[]);
+        localStorage.setItem('transactions', JSON.stringify(data.transactions));
+        localStorage.setItem('subscriptions', JSON.stringify(data.subscriptions));
+        localStorage.setItem('wishes', JSON.stringify(data.wishes));
+      }
+      if (data.language && data.baseCurrency) {
+        localStorage.setItem(ONBOARDING_KEY, '1');
+        setOnboardingDone(true);
+      }
+    }).catch(() => {});
+  }, [setLanguage, setBaseCurrency]);
+
+  // Sync all data to server when in Telegram (debounced) so other devices get updates
+  useEffect(() => {
+    if (!window.Telegram?.WebApp?.initData) return;
+    const timer = setTimeout(() => {
+      syncUserData({
+        transactions,
+        subscriptions,
+        wishes,
+        language,
+        baseCurrency,
+      }).catch(() => {});
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [transactions, subscriptions, wishes, language, baseCurrency]);
 
   // Use useCallback to prevent recreating functions on every render
   const addTransaction = useCallback((t: Transaction) => {
@@ -163,6 +219,20 @@ const AppContent: React.FC = () => {
     }
   };
 
+  if (!onboardingDone) {
+    return (
+      <div className="fixed top-0 left-0 w-full h-[100dvh] mesh-gradient text-slate-50 font-sans overflow-hidden">
+        <main className="max-w-md mx-auto h-full relative shadow-2xl bg-black/40 backdrop-blur-sm flex flex-col">
+          <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[40%] rounded-full bg-violet-600/20 blur-[120px] pointer-events-none z-0" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[40%] rounded-full bg-fuchsia-600/20 blur-[120px] pointer-events-none z-0" />
+          <div className="flex-1 overflow-y-auto z-10 p-5 pt-safe">
+            <OnboardingScreen onComplete={() => setOnboardingDone(true)} />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     // Use h-[100dvh] for mobile browsers to ignore address bar
     <div className="fixed top-0 left-0 w-full h-[100dvh] mesh-gradient text-slate-50 font-sans selection:bg-fuchsia-500 selection:text-white overflow-hidden">
@@ -181,6 +251,7 @@ const AppContent: React.FC = () => {
           <Suspense fallback={<LoadingFallback />}>
             {renderContent()}
           </Suspense>
+          <AppFooter />
         </div>
 
         {/* Navigation is fixed at the bottom of this container */}
@@ -195,9 +266,11 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <LanguageProvider>
-      <ExchangeRatesProvider>
-        <AppContent />
-      </ExchangeRatesProvider>
+      <BaseCurrencyProvider>
+        <ExchangeRatesProvider>
+          <AppContent />
+        </ExchangeRatesProvider>
+      </BaseCurrencyProvider>
     </LanguageProvider>
   );
 };

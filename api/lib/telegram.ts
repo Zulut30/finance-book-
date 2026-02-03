@@ -18,9 +18,10 @@ export function validateInitData(initData: string, botToken: string): { id: numb
   const computedHash = crypto.createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
   if (computedHash !== hash) return null;
   const authDate = params.get("auth_date");
-  if (authDate) {
-    const age = Math.floor(Date.now() / 1000) - parseInt(authDate, 10);
-    if (age > 86400) return null; // older than 24h
+  if (authDate != null && authDate !== "") {
+    const parsed = parseInt(authDate, 10);
+    const age = Math.floor(Date.now() / 1000) - parsed;
+    if (Number.isNaN(age) || age < 0 || age > 86400) return null; // invalid or older than 24h
   }
   const userStr = params.get("user");
   if (!userStr) return null;

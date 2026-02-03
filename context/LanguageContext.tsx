@@ -33,6 +33,12 @@ interface Translations {
     salary: string; freelance: string; gift: string; invest: string; rent: string;
     other: string;
   };
+  footer: { credits: string };
+  onboarding: {
+    welcome: string; chooseLanguage: string; chooseCurrency: string; start: string;
+    langRu: string; langEn: string; langPl: string;
+    currencyRub: string; currencyByn: string; currencyPln: string; currencyUsd: string; currencyEur: string;
+  };
 }
 
 const translations: Record<Language, Translations> = {
@@ -66,6 +72,12 @@ const translations: Record<Language, Translations> = {
       health: 'Здоровье', clothes: 'Одежда', tech: 'Техника', games: 'Игры', entertainment: 'Развлечения',
       education: 'Образование', pets: 'Питомцы', travel: 'Путешествия', beauty: 'Красота', charity: 'Благотворительность',
       salary: 'Зарплата', freelance: 'Фриланс', gift: 'Подарок', invest: 'Инвестиции', rent: 'Аренда', other: 'Другое'
+    },
+    footer: { credits: 'Разработано командой Manacost' },
+    onboarding: {
+      welcome: 'Здравствуйте! Добро пожаловать.', chooseLanguage: 'Выберите язык', chooseCurrency: 'Выберите основную валюту', start: 'Начать',
+      langRu: 'Русский', langEn: 'English', langPl: 'Polski',
+      currencyRub: 'Российский рубль', currencyByn: 'Белорусский рубль', currencyPln: 'Польский злотый', currencyUsd: 'Доллар США', currencyEur: 'Евро'
     }
   },
   en: {
@@ -98,6 +110,12 @@ const translations: Record<Language, Translations> = {
       health: 'Health', clothes: 'Clothes', tech: 'Tech', games: 'Games', entertainment: 'Fun',
       education: 'Education', pets: 'Pets', travel: 'Travel', beauty: 'Beauty', charity: 'Charity',
       salary: 'Salary', freelance: 'Freelance', gift: 'Gift', invest: 'Investments', rent: 'Rent', other: 'Other'
+    },
+    footer: { credits: 'Developed by Manacost team' },
+    onboarding: {
+      welcome: 'Hello! Welcome.', chooseLanguage: 'Choose language', chooseCurrency: 'Choose main currency', start: 'Start',
+      langRu: 'Russian', langEn: 'English', langPl: 'Polish',
+      currencyRub: 'Russian ruble', currencyByn: 'Belarusian ruble', currencyPln: 'Polish zloty', currencyUsd: 'US dollar', currencyEur: 'Euro'
     }
   },
   pl: {
@@ -130,6 +148,12 @@ const translations: Record<Language, Translations> = {
       health: 'Zdrowie', clothes: 'Ubrania', tech: 'Sprzęt', games: 'Gry', entertainment: 'Rozrywka',
       education: 'Edukacja', pets: 'Zwierzęta', travel: 'Podróże', beauty: 'Uroda', charity: 'Charytatywność',
       salary: 'Wypłata', freelance: 'Freelance', gift: 'Prezent', invest: 'Inwestycje', rent: 'Wynajem', other: 'Inne'
+    },
+    footer: { credits: 'Opracowane przez zespół Manacost' },
+    onboarding: {
+      welcome: 'Witaj! Zapraszamy.', chooseLanguage: 'Wybierz język', chooseCurrency: 'Wybierz walutę główną', start: 'Rozpocznij',
+      langRu: 'Rosyjski', langEn: 'Angielski', langPl: 'Polski',
+      currencyRub: 'Rubel rosyjski', currencyByn: 'Rubel białoruski', currencyPln: 'Złoty polski', currencyUsd: 'Dolar amerykański', currencyEur: 'Euro'
     }
   }
 };
@@ -142,24 +166,34 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [language, setLanguage] = useState<Language>('ru');
+const STORAGE_LANG = 'fintrack_language';
 
-  useEffect(() => {
-    // Detect language from Telegram or Browser
-    let detectedLang: string = 'ru';
-    
+function getInitialLanguage(): Language {
+  try {
+    const saved = localStorage.getItem(STORAGE_LANG);
+    if (saved === 'pl' || saved === 'en' || saved === 'ru') return saved;
+  } catch {}
+  let detected = 'ru';
+  if (typeof window !== 'undefined') {
     if (window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code) {
-      detectedLang = window.Telegram.WebApp.initDataUnsafe.user.language_code;
+      detected = window.Telegram.WebApp.initDataUnsafe.user.language_code;
     } else {
-      detectedLang = navigator.language.split('-')[0];
+      detected = navigator.language.split('-')[0];
     }
+  }
+  if (detected === 'pl') return 'pl';
+  if (detected === 'en') return 'en';
+  return 'ru';
+}
 
-    if (detectedLang === 'pl') setLanguage('pl');
-    else if (detectedLang === 'en') setLanguage('en');
-    else setLanguage('ru'); // Default to Russian if not EN or PL
-  }, []);
-
+export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [language, setLanguageState] = useState<Language>(getInitialLanguage);
+  const setLanguage = (lang: Language) => {
+    setLanguageState(lang);
+    try {
+      localStorage.setItem(STORAGE_LANG, lang);
+    } catch {}
+  };
   return (
     <LanguageContext.Provider value={{ language, setLanguage, t: translations[language] }}>
       {children}
