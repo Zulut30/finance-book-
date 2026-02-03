@@ -33,7 +33,7 @@ interface Translations {
     salary: string; freelance: string; gift: string; invest: string; rent: string;
     other: string;
   };
-  footer: { credits: string };
+  footer: { credits: string; syncHint: string };
   onboarding: {
     welcome: string; chooseLanguage: string; chooseCurrency: string; start: string;
     langRu: string; langEn: string; langPl: string;
@@ -73,7 +73,7 @@ const translations: Record<Language, Translations> = {
       education: 'Образование', pets: 'Питомцы', travel: 'Путешествия', beauty: 'Красота', charity: 'Благотворительность',
       salary: 'Зарплата', freelance: 'Фриланс', gift: 'Подарок', invest: 'Инвестиции', rent: 'Аренда', other: 'Другое'
     },
-    footer: { credits: 'Разработано командой Manacost' },
+    footer: { credits: 'Разработано командой Manacost', syncHint: 'Откройте приложение из Telegram (меню бота), чтобы синхронизировать данные между устройствами.' },
     onboarding: {
       welcome: 'Здравствуйте! Добро пожаловать.', chooseLanguage: 'Выберите язык', chooseCurrency: 'Выберите основную валюту', start: 'Начать',
       langRu: 'Русский', langEn: 'English', langPl: 'Polski',
@@ -111,7 +111,7 @@ const translations: Record<Language, Translations> = {
       education: 'Education', pets: 'Pets', travel: 'Travel', beauty: 'Beauty', charity: 'Charity',
       salary: 'Salary', freelance: 'Freelance', gift: 'Gift', invest: 'Investments', rent: 'Rent', other: 'Other'
     },
-    footer: { credits: 'Developed by Manacost team' },
+    footer: { credits: 'Developed by Manacost team', syncHint: 'Open the app from Telegram (bot menu) to sync data across devices.' },
     onboarding: {
       welcome: 'Hello! Welcome.', chooseLanguage: 'Choose language', chooseCurrency: 'Choose main currency', start: 'Start',
       langRu: 'Russian', langEn: 'English', langPl: 'Polish',
@@ -149,7 +149,7 @@ const translations: Record<Language, Translations> = {
       education: 'Edukacja', pets: 'Zwierzęta', travel: 'Podróże', beauty: 'Uroda', charity: 'Charytatywność',
       salary: 'Wypłata', freelance: 'Freelance', gift: 'Prezent', invest: 'Inwestycje', rent: 'Wynajem', other: 'Inne'
     },
-    footer: { credits: 'Opracowane przez zespół Manacost' },
+    footer: { credits: 'Opracowane przez zespół Manacost', syncHint: 'Otwórz aplikację z Telegrama (menu bota), aby synchronizować dane między urządzeniami.' },
     onboarding: {
       welcome: 'Witaj! Zapraszamy.', chooseLanguage: 'Wybierz język', chooseCurrency: 'Wybierz walutę główną', start: 'Rozpocznij',
       langRu: 'Rosyjski', langEn: 'Angielski', langPl: 'Polski',

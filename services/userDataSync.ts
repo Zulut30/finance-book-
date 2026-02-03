@@ -2,8 +2,27 @@ import type { Transaction, Subscription, Wish } from "../types";
 
 const API_BASE = typeof window !== "undefined" && window.location?.origin ? window.location.origin : "";
 
-function getInitData(): string | undefined {
+export function getInitData(): string | undefined {
   return typeof window !== "undefined" && (window as unknown as { Telegram?: { WebApp?: { initData?: string } } }).Telegram?.WebApp?.initData;
+}
+
+/** Wait for initData to appear (e.g. Telegram Desktop injects it slightly later). Resolves with initData or undefined after maxAttempts. */
+export function waitForInitData(maxAttempts = 6, intervalMs = 400): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    const check = (attempt: number) => {
+      const data = getInitData();
+      if (data) {
+        resolve(data);
+        return;
+      }
+      if (attempt >= maxAttempts) {
+        resolve(undefined);
+        return;
+      }
+      setTimeout(() => check(attempt + 1), intervalMs);
+    };
+    check(0);
+  });
 }
 
 export interface UserDataFromServer {

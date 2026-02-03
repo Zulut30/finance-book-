@@ -6,7 +6,7 @@ import { LanguageProvider } from './context/LanguageContext';
 import { BaseCurrencyProvider, useBaseCurrency } from './context/BaseCurrencyContext';
 import { ExchangeRatesProvider } from './context/ExchangeRatesContext';
 import { triggerHaptic } from './utils/telegram';
-import { fetchUserData, syncUserData } from './services/userDataSync';
+import { fetchUserData, syncUserData, waitForInitData, getInitData } from './services/userDataSync';
 import { useLanguage } from './context/LanguageContext';
 import { OnboardingScreen } from './components/OnboardingScreen';
 
@@ -39,10 +39,15 @@ const LoadingFallback = () => (
   </div>
 );
 
-const AppFooter: React.FC = () => {
+const AppFooter: React.FC<{ showSyncHint?: boolean }> = ({ showSyncHint }) => {
   const { t } = useLanguage();
   return (
     <footer className="text-center py-3 text-slate-500 text-[10px]">
+      {showSyncHint && (
+        <p className="mb-2 px-3 py-2 rounded-xl bg-amber-500/10 text-amber-200 text-xs border border-amber-500/20">
+          {t.footer.syncHint}
+        </p>
+      )}
       FinTrack · {t.footer.credits}
     </footer>
   );
@@ -56,6 +61,7 @@ const AppContent: React.FC = () => {
     if (typeof window === 'undefined') return true;
     return localStorage.getItem(ONBOARDING_KEY) === '1';
   });
+  const [hasInitData, setHasInitData] = useState(() => !!getInitData());
   const { language, setLanguage } = useLanguage();
   const { baseCurrency, setBaseCurrency } = useBaseCurrency();
 
@@ -103,37 +109,45 @@ const AppContent: React.FC = () => {
     localStorage.setItem('wishes', JSON.stringify(wishes));
   }, [wishes]);
 
-  // Load data from server when opened in Telegram (same account = sync across devices)
+  // Load data from server when opened in Telegram (same account = sync across devices). Retry waiting for initData (e.g. Telegram Desktop injects it slightly later).
   useEffect(() => {
-    if (!window.Telegram?.WebApp?.initData) return;
-    fetchUserData().then((data) => {
-      if (!data) return;
-      if (data.language && (data.language === 'ru' || data.language === 'en' || data.language === 'pl')) {
-        setLanguage(data.language);
-        localStorage.setItem('fintrack_language', data.language);
-      }
-      if (data.baseCurrency && ['RUB', 'BYN', 'PLN', 'USD', 'EUR'].includes(data.baseCurrency)) {
-        setBaseCurrency(data.baseCurrency as import('./types').Currency);
-        localStorage.setItem('fintrack_base_currency', data.baseCurrency);
-      }
-      if (data.updatedAt) {
-        setTransactions(data.transactions as Transaction[]);
-        setSubscriptions(data.subscriptions as Subscription[]);
-        setWishes(data.wishes as Wish[]);
-        localStorage.setItem('transactions', JSON.stringify(data.transactions));
-        localStorage.setItem('subscriptions', JSON.stringify(data.subscriptions));
-        localStorage.setItem('wishes', JSON.stringify(data.wishes));
-      }
-      if (data.language && data.baseCurrency) {
-        localStorage.setItem(ONBOARDING_KEY, '1');
-        setOnboardingDone(true);
-      }
-    }).catch(() => {});
+    if (!window.Telegram?.WebApp) return;
+    let cancelled = false;
+    waitForInitData(6, 400).then((initData) => {
+      setHasInitData(!!initData);
+      if (cancelled || !initData) return;
+      fetchUserData().then((data) => {
+        if (cancelled || !data) return;
+        if (data.language && (data.language === 'ru' || data.language === 'en' || data.language === 'pl')) {
+          setLanguage(data.language);
+          try { localStorage.setItem('fintrack_language', data.language); } catch (_) {}
+        }
+        if (data.baseCurrency && ['RUB', 'BYN', 'PLN', 'USD', 'EUR'].includes(data.baseCurrency)) {
+          setBaseCurrency(data.baseCurrency as import('./types').Currency);
+          try { localStorage.setItem('fintrack_base_currency', data.baseCurrency); } catch (_) {}
+        }
+        if (data.updatedAt) {
+          setTransactions(data.transactions as Transaction[]);
+          setSubscriptions(data.subscriptions as Subscription[]);
+          setWishes(data.wishes as Wish[]);
+          try {
+            localStorage.setItem('transactions', JSON.stringify(data.transactions));
+            localStorage.setItem('subscriptions', JSON.stringify(data.subscriptions));
+            localStorage.setItem('wishes', JSON.stringify(data.wishes));
+          } catch (_) {}
+        }
+        if (data.language && data.baseCurrency) {
+          try { localStorage.setItem(ONBOARDING_KEY, '1'); } catch (_) {}
+          setOnboardingDone(true);
+        }
+      }).catch(() => {});
+    });
+    return () => { cancelled = true; };
   }, [setLanguage, setBaseCurrency]);
 
   // Sync all data to server when in Telegram (debounced) so other devices get updates
   useEffect(() => {
-    if (!window.Telegram?.WebApp?.initData) return;
+    if (!getInitData()) return;
     const timer = setTimeout(() => {
       syncUserData({
         transactions,
@@ -145,6 +159,9 @@ const AppContent: React.FC = () => {
     }, 2000);
     return () => clearTimeout(timer);
   }, [transactions, subscriptions, wishes, language, baseCurrency]);
+
+  // Show sync hint when app is not opened from Telegram (no initData)
+  const showSyncHint = !hasInitData;
 
   // Use useCallback to prevent recreating functions on every render
   const addTransaction = useCallback((t: Transaction) => {
@@ -251,7 +268,7 @@ const AppContent: React.FC = () => {
           <Suspense fallback={<LoadingFallback />}>
             {renderContent()}
           </Suspense>
-          <AppFooter />
+          <AppFooter showSyncHint={showSyncHint} />
         </div>
 
         {/* Navigation is fixed at the bottom of this container */}

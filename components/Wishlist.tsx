@@ -71,26 +71,38 @@ export const Wishlist: React.FC<WishlistProps> = ({ wishes, onAdd, onRemove, onT
   const handleShare = () => {
     triggerHaptic('light');
     const activeWishes = wishes.filter(w => !w.isCompleted);
-    
+
     if (activeWishes.length === 0) {
-        triggerNotification('warning');
-        return;
+      triggerNotification('warning');
+      return;
     }
 
     let message = `🎁 ${t.wishlist.title} (${totalNeededInBase.toLocaleString()} ${CurrencySymbols[baseCurrency]})\n\n`;
     activeWishes.forEach((w, index) => {
-        message += `${index + 1}. ${w.title} - ${convertCurrency(w.price, Currency.PLN, baseCurrency).toLocaleString()} ${CurrencySymbols[baseCurrency]}\n`;
-        if (w.url) {
-            message += `   🔗 ${w.url}\n`;
-        }
+      message += `${index + 1}. ${w.title} - ${convertCurrency(w.price, Currency.PLN, baseCurrency).toLocaleString()} ${CurrencySymbols[baseCurrency]}\n`;
+      if (w.url) {
+        message += `   🔗 ${w.url}\n`;
+      }
     });
 
-    const shareUrl = `https://t.me/share/url?text=${encodeURIComponent(message)}`;
-    
-    if (window.Telegram?.WebApp?.openTelegramLink) {
+    // Many clients and browsers limit URL length (~2000). Keep encoded payload under ~1800 chars.
+    const maxEncodedLen = 1800;
+    let shareText = message;
+    while (encodeURIComponent(shareText).length > maxEncodedLen && shareText.length > 10) {
+      shareText = shareText.slice(0, -20).trimEnd() + '\n…';
+    }
+    const shareUrl = `https://t.me/share/url?text=${encodeURIComponent(shareText)}`;
+
+    try {
+      if (window.Telegram?.WebApp?.openTelegramLink) {
         window.Telegram.WebApp.openTelegramLink(shareUrl);
-    } else {
-        window.open(shareUrl, '_blank');
+      } else if (window.Telegram?.WebApp?.openLink) {
+        window.Telegram.WebApp.openLink(shareUrl, { try_instant_view: false });
+      } else {
+        window.open(shareUrl, '_blank', 'noopener,noreferrer');
+      }
+    } catch {
+      window.open(shareUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
