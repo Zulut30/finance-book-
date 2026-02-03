@@ -92,6 +92,16 @@ Create a `.env` file based on `.env.example`:
 
 > **Note:** The app works without API keys using demo data and fallback rates.
 
+### Проверка настроек после деплоя
+
+После добавления переменных в Vercel **обязательно сделайте передеплой** (Deployments → ⋮ у последнего деплоя → Redeploy), иначе функции не увидят новые переменные.
+
+Откройте в браузере: **`https://ваш-домен.vercel.app/api/status`**
+
+- `telegramBot: "configured"` и `redis: "configured"` — всё настроено.
+- `redis: "connection_failed"` — проверьте KV_REST_API_URL и KV_REST_API_TOKEN (скопируйте из панели Upstash заново), затем снова передеплойте.
+- Для работы **/start** нужен ещё один шаг: [установить webhook](#5-webhook-команда-start-обязательно-для-приветствия).
+
 ---
 
 ## Testing
